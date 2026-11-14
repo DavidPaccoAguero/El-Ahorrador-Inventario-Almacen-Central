@@ -112,7 +112,11 @@ CREATE TABLE dbo.Entrada (
     Placa NVARCHAR(15) NOT NULL,
     Observaciones NVARCHAR(300) NULL,
     IdUsuarioRegistro INT NOT NULL REFERENCES dbo.Usuario (IdUsuario),
-    CONSTRAINT UQ_Entrada_Confirmacion UNIQUE (IdUsuarioRegistro, NumeroConfirmacion)
+    CONSTRAINT UQ_Entrada_Confirmacion UNIQUE (IdUsuarioRegistro, NumeroConfirmacion),
+    CONSTRAINT CK_Entrada_OrigenExclusivo CHECK (
+        (Tipo = 'COMPRA_PROVEEDOR' AND Proveedor IS NOT NULL AND IdLocalOrigen IS NULL) OR
+        (Tipo = 'DEVOLUCION_LOCAL' AND Proveedor IS NULL AND IdLocalOrigen IS NOT NULL)
+    )
 );
 
 CREATE TABLE dbo.DetalleEntrada (
@@ -122,10 +126,11 @@ CREATE TABLE dbo.DetalleEntrada (
     IdProducto INT NOT NULL,
     IdUnidadMedida INT NOT NULL,
     IdUbicacion INT NOT NULL,
-    CantidadEsperada DECIMAL(18,3) NOT NULL,
-    CantidadRecibida DECIMAL(18,3) NOT NULL,
+    CantidadEsperada DECIMAL(18,3) NOT NULL CHECK (CantidadEsperada > 0),
+    CantidadRecibida DECIMAL(18,3) NOT NULL CHECK (CantidadRecibida > 0),
     CantidadAceptada DECIMAL(18,3) NOT NULL,
-    ResultadoVerificacion VARCHAR(20) NOT NULL,
+    ResultadoVerificacion VARCHAR(20) NOT NULL CHECK (ResultadoVerificacion IN ('CONFORME', 'CON_INCIDENCIA')),
+    CONSTRAINT CK_DetalleEntrada_Cantidades CHECK (CantidadAceptada >= 0 AND CantidadAceptada <= CantidadRecibida),
     FOREIGN KEY (IdProducto, IdUnidadMedida) REFERENCES dbo.ProductoUnidadControlStock (IdProducto, IdUnidadMedida),
     FOREIGN KEY (IdProducto, IdUbicacion) REFERENCES dbo.Existencia (IdProducto, IdUbicacion)
 );
@@ -133,8 +138,8 @@ CREATE TABLE dbo.DetalleEntrada (
 CREATE TABLE dbo.IncidenciaRecepcion (
     IdIncidencia INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
     IdDetalleEntrada INT NOT NULL REFERENCES dbo.DetalleEntrada (IdDetalleEntrada),
-    Tipo VARCHAR(20) NOT NULL,
-    CantidadAfectada DECIMAL(18,3) NOT NULL,
+    Tipo VARCHAR(20) NOT NULL CHECK (Tipo IN ('FALTANTE', 'NO_ACEPTADO', 'OBSERVACION')),
+    CantidadAfectada DECIMAL(18,3) NOT NULL CHECK (CantidadAfectada >= 0),
     Observaciones NVARCHAR(300) NOT NULL,
     FechaHora DATETIME2(0) NOT NULL DEFAULT (SYSDATETIME()),
     IdUsuarioRegistro INT NOT NULL REFERENCES dbo.Usuario (IdUsuario)
@@ -148,10 +153,10 @@ CREATE TABLE dbo.GrupoExistencia (
     IdDetalleEntrada INT NULL REFERENCES dbo.DetalleEntrada (IdDetalleEntrada),
     FechaRecepcion DATETIME2(0) NOT NULL DEFAULT (SYSDATETIME()),
     Lote NVARCHAR(60) NULL,
-    OrigenLote VARCHAR(12) NULL,
+    OrigenLote VARCHAR(12) NULL CHECK (OrigenLote IS NULL OR OrigenLote IN ('FABRICANTE', 'INTERNO')),
     Vencimiento DATE NULL,
-    EstadoVerificacionVencimiento VARCHAR(15) NOT NULL,
-    CantidadRegistrada DECIMAL(18,3) NOT NULL,
+    EstadoVerificacionVencimiento VARCHAR(15) NOT NULL CHECK (EstadoVerificacionVencimiento IN ('NO_REQUERIDO', 'PENDIENTE', 'VERIFICADO')),
+    CantidadRegistrada DECIMAL(18,3) NOT NULL CHECK (CantidadRegistrada >= 0),
     FOREIGN KEY (IdProducto, IdUnidadMedida) REFERENCES dbo.ProductoUnidadControlStock (IdProducto, IdUnidadMedida),
     FOREIGN KEY (IdProducto, IdUbicacion) REFERENCES dbo.Existencia (IdProducto, IdUbicacion)
 );
@@ -207,7 +212,8 @@ INSERT INTO dbo.Local (IdLocal, Nombre) VALUES
 INSERT INTO dbo.Categoria (Nombre, Descripcion, Estado, IdCategoriaSuperior) VALUES
 (N'Alimentos', N'Categoría raíz de productos alimenticios', 1, NULL),
 (N'Bebidas', N'Aguas y bebidas embotelladas', 1, 1),
-(N'Lácteos', N'Productos lácteos refrigerados', 1, 1);
+(N'Lácteos', N'Productos lácteos refrigerados', 1, 1),
+(N'Limpieza del hogar', N'Detergentes y desinfectantes domésticos', 1, NULL);
 
 INSERT INTO dbo.UnidadMedida (Nombre, Simbolo, Dimension, FactorBase, Estado) VALUES
 (N'unidad', N'unidad', 'UNIDAD', NULL, 1),
@@ -221,11 +227,13 @@ INSERT INTO dbo.UnidadControlStock (IdUnidadMedida, Descripcion, DecimalesPermit
 
 INSERT INTO dbo.Zona (Nombre, Descripcion, Clasificacion, PermiteSeco, PermiteRefrigerado, PermiteCongelado, Estado) VALUES
 (N'Productos secos', N'Almacenamiento seco de alimentos y bebidas', 'ALIMENTO', 1, 0, 0, 1),
-(N'Carnes y Refrigerados', N'Almacenamiento refrigerado', 'ALIMENTO', 0, 1, 0, 1);
+(N'Carnes y Refrigerados', N'Almacenamiento refrigerado', 'ALIMENTO', 0, 1, 0, 1),
+(N'Zona Limpieza', N'Almacenamiento exclusivo de limpieza del hogar', 'LIMPIEZA_HOGAR', 1, 0, 0, 1);
 
 INSERT INTO dbo.Ubicacion (Codigo, Nombre, Descripcion, IdZona, TipoConservacion, Estado) VALUES
 (N'SEC-01', N'Estante seco 01', N'Ubicación de productos secos', 1, 'SECO', 1),
-(N'REF-01', N'Cámara refrigerada 01', N'Ubicación refrigerada', 2, 'REFRIGERADO', 1);
+(N'REF-01', N'Cámara refrigerada 01', N'Ubicación refrigerada', 2, 'REFRIGERADO', 1),
+(N'LIM-01', N'Estante limpieza 01', N'Ubicación separada de limpieza', 3, 'SECO', 1);
 
 INSERT INTO dbo.Producto (Codigo, Nombre, Descripcion, PresentacionFisica, IdCategoria, Clasificacion, ConservacionRequerida, ControlLote, ControlVencimiento, Estado) VALUES
 (N'AG-625', N'Agua de mesa 625 mL', N'Agua de mesa en botella', N'Botella de 625 mL', 2, 'ALIMENTO', 'SECO', 1, 1, 1),
