@@ -23,5 +23,10 @@ namespace ElAhorrador.Negocio.Dominio
         {
             get { return Estado ? "Activo" : "Inactivo"; }
         }
+
+        public string EtiquetaCombo
+        {
+            get { return $"{Codigo} - {Nombre}"; }
+        }
     }
 }
