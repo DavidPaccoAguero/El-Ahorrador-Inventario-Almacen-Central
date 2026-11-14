@@ -14,13 +14,15 @@ namespace ElAhorrador.Presentacion
     {
         private readonly ServicioUsuarios _servicioUsuarios;
         private readonly ServicioCatalogos _servicioCatalogos;
+        private readonly ServicioInventario _servicioInventario;
         private readonly ConexionSql _conexionSql;
 
-        public FrmLogin(ServicioUsuarios servicioUsuarios, ServicioCatalogos servicioCatalogos, ConexionSql conexionSql)
+        public FrmLogin(ServicioUsuarios servicioUsuarios, ServicioCatalogos servicioCatalogos, ServicioInventario servicioInventario, ConexionSql conexionSql)
         {
             InitializeComponent();
             _servicioUsuarios = servicioUsuarios;
             _servicioCatalogos = servicioCatalogos;
+            _servicioInventario = servicioInventario;
             _conexionSql = conexionSql;
         }
 
@@ -47,11 +49,13 @@ namespace ElAhorrador.Presentacion
             }
 
             Hide();
-            using var frmPrincipal = new FrmPrincipal(_servicioUsuarios, _servicioCatalogos);
+            using var frmPrincipal = new FrmPrincipal(_servicioUsuarios, _servicioCatalogos, _servicioInventario);
             frmPrincipal.ShowDialog(this);
 
             txtContrasena.Clear();
             Show();
+            var estadoBd = _conexionSql.ProbarConexion();
+            lblEstadoBd.Text = estadoBd.Mensaje;
             txtUsuario.Focus();
         }
     }

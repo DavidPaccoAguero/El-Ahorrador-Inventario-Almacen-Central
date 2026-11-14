@@ -15,11 +15,13 @@ namespace ElAhorrador.Presentacion
             var conexionSql = new ConexionSql();
             var repositorioUsuarios = new RepositorioUsuariosSql(conexionSql);
             var repositorioCatalogos = new RepositorioCatalogosSql(conexionSql);
+            var repositorioInventario = new RepositorioInventarioSql(conexionSql);
 
             var servicioUsuarios = new ServicioUsuarios(repositorioUsuarios);
             var servicioCatalogos = new ServicioCatalogos(repositorioCatalogos);
+            var servicioInventario = new ServicioInventario(repositorioInventario, repositorioCatalogos);
 
-            Application.Run(new FrmLogin(servicioUsuarios, servicioCatalogos, conexionSql));
+            Application.Run(new FrmLogin(servicioUsuarios, servicioCatalogos, servicioInventario, conexionSql));
         }
     }
 }
